@@ -16,7 +16,7 @@ use App\Models\Party;
 
 Route::get('/payment/{payment}', function (Payment $payment) {
     // ...
-})->middleware('expire');
+})->middleware('expires');
 ```
 
 ## Become a sponsor
