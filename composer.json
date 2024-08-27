@@ -1,0 +1,61 @@
+{
+    "name": "laragear/expire-route",
+    "description": "Don't find route models created after a moment in time.",
+    "type": "library",
+    "license": "MIT",
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "authors": [
+        {
+            "name": "Italo Baeza C.",
+            "email": "DarkGhostHunter@Gmail.com",
+            "homepage": "https://patreon.com/packagesforlaravel"
+        }
+    ],
+    "support": {
+        "source": "https://github.com/Laragear/ExpireRoute",
+        "issues": "https://github.com/Laragear/ExpireRoute/issues"
+    },
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "10.*|11.*",
+        "illuminate/http": "10.*|11.*"
+    },
+    "require-dev": {
+        "orchestra/testbench": "8.*|9.*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Laragear\\ExpireRoute\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit --coverage-clover build/logs/clover.xml",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Laragear\\Pay\\ExpireRouteModelServiceProvider"
+            ]
+        }
+    },
+    "funding": [
+        {
+            "type": "Github Sponsorship",
+            "url": "https://github.com/sponsors/DarkGhostHunter"
+        },
+        {
+            "type": "Paypal",
+            "url": "https://paypal.me/darkghosthunter"
+        }
+    ]
+}
