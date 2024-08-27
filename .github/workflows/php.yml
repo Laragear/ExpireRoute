@@ -125,7 +125,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_ORG_TOKEN }}
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Check exported files
         run: |
