@@ -41,7 +41,7 @@ class Expires
     /**
      * Handle the incoming request.
      */
-    public function handle(Request $request, Closure $next, string $parameter = null, string $relative = null): mixed
+    public function handle(Request $request, Closure $next, ?string $parameter = null, ?string $relative = null): mixed
     {
         // If there is no parameter to find, fail.
         if (!$parameter ??= $this->getLastRouteParameter($request)) {
