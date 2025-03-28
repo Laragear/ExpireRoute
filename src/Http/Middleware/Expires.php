@@ -6,9 +6,11 @@ use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\DateFactory;
+use Laragear\ExpireRoute\Contracts\RouteExpirable;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use function array_pad;
@@ -16,19 +18,20 @@ use function data_get;
 use function explode;
 use function get_class;
 use function is_numeric;
-use function is_string;
 
+/**
+ * @method static \Laragear\ExpireRoute\Http\Middleware\ExpiresDeclaration attribute(string $attribute)
+ * @method static \Laragear\ExpireRoute\Http\Middleware\ExpiresDeclaration using(string $parameter)
+ * @method static \Laragear\ExpireRoute\Http\Middleware\ExpiresDeclaration after(string $interval)
+ * @method static \Laragear\ExpireRoute\Http\Middleware\ExpiresDeclaration in(int $amount)
+ * @method static \Laragear\ExpireRoute\Http\Middleware\ExpiresDeclaration and(int $amount)
+ */
 class Expires
 {
     /**
      * The name of the middleware.
      */
     public const SIGNATURE = 'expires';
-
-    /**
-     * The default attribute/property for expiration.
-     */
-    protected const EXPIRATION_ATTRIBUTE = 'expired_at';
 
     /**
      * Create a new middleware instance.
@@ -41,27 +44,26 @@ class Expires
     /**
      * Handle the incoming request.
      */
-    public function handle(Request $request, Closure $next, ?string $parameter = null, ?string $relative = null): mixed
+    public function handle(Request $request, Closure $next, string $parameter = '', string $relative = ''): mixed
     {
         // If there is no parameter to find, fail.
-        if (!$parameter ??= $this->getLastRouteParameter($request)) {
+        if ($parameter === '' && !$parameter = $this->getLastRouteParameter($request)) {
             throw new RuntimeException("The path [{$request->path()}] has no route parameter to find an expiration.");
         }
 
         // Parse the parameter and detach the attribute/property.
-        [$parameter, $attribute] = $this->separateParameterFromAttribute($parameter);
+        [$parameter, $attribute] = $this->parseParameter($parameter);
 
         // Let's now find the object of the route parameter.
         $object = $request->route($parameter);
 
-        // If the attribute null, we will try to find the proper attribute name if we're relative or not.
-        $attribute = $this->normalizeAttribute($object, $attribute, $relative);
+        $expiresAt = $object instanceof RouteExpirable
+            ? $this->parseExpirableTimestamp($object, $attribute, $relative)
+            : $this->parseTimestamp($object, $this->normalizeAttribute($object, $attribute, $relative), $relative);
 
         // If the expiration time is past, then bail out.
-        if ($this->date->now() > $this->findTimestamp($object, $attribute, $relative)) {
-            $object instanceof Model
-                ? throw (new ModelNotFoundException())->setModel(get_class($object), $object->getKey())
-                : throw new NotFoundHttpException();
+        if ($expiresAt->isPast()) {
+            $this->throwResponse($object);
         }
 
         return $next($request);
@@ -72,57 +74,95 @@ class Expires
      */
     protected function getLastRouteParameter(Request $request): ?string
     {
-        // @phpstan-ignore-next-line
-        return Arr::last($request->route()->parameterNames());
+        return Arr::last($request->route()->parameterNames()); // @phpstan-ignore-line
+    }
+
+    /**
+     * Retrieve the timestamp from the RouteExpirable instance.
+     */
+    protected function parseExpirableTimestamp(RouteExpirable $expirable, string $attribute, string $relative): Carbon
+    {
+        $expiresAt = $attribute
+            ? $this->parseTimestamp($expirable, $attribute, $relative)
+            : $this->date->parse($expirable->routeExpiresAt());
+
+        return $relative ? $this->addRelativeTimeToDatetime($expiresAt, $relative) : $expiresAt;
     }
 
     /**
      * Returns the parameter name and the attribute name from the middleware argument string.
+     *
+     * @return array{0: string, 1: string}
      */
-    protected function separateParameterFromAttribute(string $parameter): array
+    protected function parseParameter(string $parameter): array
     {
-        return array_pad(explode('.', $parameter, 2), 2, null);
+        return array_pad(explode('.', $parameter, 2), 2, '');
     }
 
     /**
      * Finds the proper attribute to check if it wasn't set.
      */
-    protected function normalizeAttribute(mixed $object, ?string $attribute, ?string $relative): string
+    protected function normalizeAttribute(mixed $object, string $attribute, string $relative): string
     {
         if ($attribute) {
             return $attribute;
         }
 
-        if (null === $relative) {
-            return static::EXPIRATION_ATTRIBUTE;
+        if (!$relative) {
+            return 'expired_at';
         }
 
-        return $object->getCreatedAtColumn();
+        // Only return the Created At Column if the model is using one.
+        if ($object instanceof Model && $attribute = $object->getCreatedAtColumn()) {
+            return $attribute;
+        }
+
+        return Model::CREATED_AT;
     }
 
     /**
      * Find the timestamp from the object.
      */
-    protected function findTimestamp(mixed $object, string $attribute, ?string $relative): Carbon
+    protected function parseTimestamp(mixed $object, string $attribute, string $relative): Carbon
     {
-        $date = $this->date->parse(data_get($object, $attribute, 'now'));
-
-        if (is_numeric($relative)) {
-            $date = $date->add('minutes', (int) $relative);
-        } elseif (is_string($relative)) {
-            $date = $date->add($relative);
-        }
-
-        return $date;
+        return $this->addRelativeTimeToDatetime(
+            $this->date->parse(data_get($object, $attribute) ?? 'yesterday'), $relative
+        );
     }
 
     /**
-     * Create a new middleware declaration.
+     * Adds a unit of time to the relative datetime.
      */
-    public static function by(string $parameter): ExpiresDeclaration
+    protected function addRelativeTimeToDatetime(Carbon $dateTime, string $relative): Carbon
     {
-        [$parameter, $attribute] = array_pad(explode('.', $parameter, 2), 2, '');
+        return match (true) {
+            is_numeric($relative) => $dateTime->add('minutes', (int) $relative),
+            $relative !== '' => $dateTime->add($relative),
+            default => $dateTime
+        };
+    }
 
-        return new ExpiresDeclaration($parameter, $attribute);
+    /**
+     * Throws the response to the browser.
+     */
+    protected function throwResponse(mixed $object): never
+    {
+        $message = 'The route has expired.';
+        $previous = null;
+
+        if ($object instanceof Model) {
+            $previous = (new ModelNotFoundException())->setModel(get_class($object), $object->getKey());
+            $message = $previous->getMessage();
+        }
+
+        throw NotFoundHttpException::fromStatusCode(410, $message, $previous);
+    }
+
+    /**
+     * Dynamically call non-existing methods to the Middleware Declaration.
+     */
+    public static function __callStatic(string $name, array $arguments)
+    {
+        return (new ExpiresDeclaration())->{$name}(...$arguments);
     }
 }

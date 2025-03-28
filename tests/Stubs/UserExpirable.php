@@ -2,22 +2,17 @@
 
 namespace Tests\Stubs;
 
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
+use Laragear\ExpireRoute\Contracts\RouteExpirable;
 
-class UserWithExpirations extends User
+class UserExpirable extends User implements RouteExpirable
 {
     protected $table = 'users';
 
     public static $expiredAt = null;
-
-    public static $getCreatedAtColumn = Model::CREATED_AT;
-
-    public function getCreatedAtColumn()
-    {
-        return static::$getCreatedAtColumn;
-    }
 
     protected function expiredAt(): Attribute
     {
@@ -27,5 +22,10 @@ class UserWithExpirations extends User
     protected function customTimestamp(): Attribute
     {
         return Attribute::get(fn() => static::$expiredAt);
+    }
+
+    public function routeExpiresAt(): DateTimeInterface
+    {
+        return static::$expiredAt;
     }
 }

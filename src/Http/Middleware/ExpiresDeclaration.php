@@ -7,8 +7,11 @@ use Carbon\CarbonInterval;
 use InvalidArgumentException;
 use Stringable;
 use function array_filter;
+use function array_pad;
+use function explode;
 use function implode;
 use function in_array;
+use function str_ends_with;
 
 /**
  * @method self second()
@@ -52,12 +55,24 @@ class ExpiresDeclaration implements Stringable
      * Create a new middleware declaration.
      */
     public function __construct(
-        protected string $parameter,
-        protected string $attribute,
+        protected string $parameter = '',
+        protected string $attribute = '',
         protected CarbonInterval|string $relative = '',
         protected int $amount = 1,
     ) {
         //
+    }
+
+    /**
+     * Sets the route parameter to check for expiration.
+     *
+     * @return $this
+     */
+    public function using(string $parameter): static
+    {
+        [$this->parameter, $this->attribute] = array_pad(explode('.', $parameter, 2), 2, '');
+
+        return $this;
     }
 
     /**
@@ -143,6 +158,12 @@ class ExpiresDeclaration implements Stringable
             ? $this->relative->totalMinutes
             : $this->relative;
 
-        return Expires::SIGNATURE.':'.implode(',', array_filter([$field, $relative]));
+        $declaration = Expires::SIGNATURE.':'.implode(',', [$field, $relative]);
+
+        if (str_ends_with($declaration, ',')) {
+            $declaration = substr($declaration, 0, -1);
+        }
+
+        return $declaration;
     }
 }

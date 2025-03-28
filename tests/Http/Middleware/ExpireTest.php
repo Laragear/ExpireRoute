@@ -2,8 +2,12 @@
 
 namespace Tests\Http\Middleware;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
-use Illuminate\Support\Facades\Route;
+use Illuminate\Routing\Route;
+use Illuminate\Routing\Router;
+use Orchestra\Testbench\Attributes\DefineRoute;
+use Tests\Stubs\UserExpirable;
 use Tests\Stubs\UserWithExpirations;
 use Tests\TestCase;
 use function now;
@@ -17,6 +21,16 @@ class ExpireTest extends TestCase
         $this->loadLaravelMigrations();
     }
 
+    protected function router(string $uri = '/test/{user}', string $middleware = ''): Route
+    {
+        return $this->app->make('router')->get($uri, fn() => 'ok')->middleware(['web', $middleware]);
+    }
+
+    public static function definesRoute($router): void
+    {
+        $router->get('/user/{user}', fn(UserWithExpirations $user) => $user)->middleware(['web', 'expires']);
+    }
+
     protected function setUp(): void
     {
         $this->afterApplicationCreated(function () {
@@ -27,13 +41,21 @@ class ExpireTest extends TestCase
             ]);
         });
 
+        UserWithExpirations::$getCreatedAtColumn = Model::CREATED_AT;
+        UserWithExpirations::$expiredAt = null;
+        UserExpirable::$expiredAt = null;
+
         parent::setUp();
     }
 
+    public static function definesRouteWithoutField($router): void
+    {
+        $router->get('/user/test', fn() => 'ok')->middleware(['web', 'expires']);
+    }
+
+    #[DefineRoute('definesRouteWithoutField')]
     public function test_throws_when_no_fields(): void
     {
-        Route::get('/user/test', fn() => 'ok')->middleware('web', 'expires');
-
         $request = $this->get('/user/test');
 
         $request->assertServerError();
@@ -44,146 +66,246 @@ class ExpireTest extends TestCase
         );
     }
 
+    #[DefineRoute('definesRoute')]
     public function test_uses_last_route_parameter_with_expires_at_attribute(): void
     {
-        UserWithExpirations::$expiresAt = now()->addHour();
-
-        Route::get('/user/{user}', fn(UserWithExpirations $user) => $user)->middleware('web', 'expires');
+        UserWithExpirations::$expiredAt = now()->addHour();
 
         $this->get('/user/1')->assertOk();
     }
 
-    public function test_uses_last_route_parameter_with_expires_at_attribute_not_found(): void
+    #[DefineRoute('definesRoute')]
+    public function test_uses_last_route_parameter_with_expires_at_attribute_gone(): void
     {
-        UserWithExpirations::$expiresAt = now()->subSecond();
+        UserWithExpirations::$expiredAt = now()->subSecond();
 
-        Route::get('/user/{user}', fn(UserWithExpirations $user) => $user)->middleware('web', 'expires');
+        $this->get('/user/1')->assertStatus(410)->dump();
 
-        $this->get('/user/1')->assertNotFound();
+        UserWithExpirations::$expiredAt = now();
+
+        $this->get('/user/1')->assertStatus(410)->dump();
     }
 
+    public static function definesRouteWithMultipleParameters($router): void
+    {
+        $router->get('/user/{user}/number/{number}', fn(UserWithExpirations $user) => $user)
+            ->middleware(['web', 'expires:user']);
+    }
+
+    #[DefineRoute('definesRouteWithMultipleParameters')]
     public function test_specifies_parameter(): void
     {
-        UserWithExpirations::$expiresAt = now()->addHour();
-
-        Route::get('/user/{user}/number/{number}', fn(UserWithExpirations $user) => $user)
-            ->middleware('web', 'expires:user');
+        UserWithExpirations::$expiredAt = now()->addHour();
 
         $this->get('/user/1/number/10')->assertOk();
     }
-    public function test_specifies_parameter_not_found(): void
+
+    #[DefineRoute('definesRouteWithMultipleParameters')]
+    public function test_specifies_parameter_gone(): void
     {
-        UserWithExpirations::$expiresAt = now()->subSecond();
+        UserWithExpirations::$expiredAt = now()->subSecond();
 
-        Route::get('/user/{user}/number/{number}', fn(UserWithExpirations $user) => $user)
-            ->middleware('web', 'expires:user');
-
-        $this->get('/user/1/number/10')->assertNotFound();
+        $this->get('/user/1/number/10')->assertStatus(410);
     }
 
+    public static function definesRouteWithMultipleParametersAndAttribute($router): void
+    {
+        $router->get('/user/{user}/number/{number}', fn(UserWithExpirations $user) => $user)
+            ->middleware(['web', 'expires:user.customTimestamp']);
+    }
+
+    #[DefineRoute('definesRouteWithMultipleParametersAndAttribute')]
     public function test_specifies_parameter_with_attribute(): void
     {
-        UserWithExpirations::$expiresAt = now()->addHour();
-
-        Route::get('/user/{user}/number/{number}', fn(UserWithExpirations $user) => $user)
-            ->middleware('web', 'expires:user.customTimestamp');
+        UserWithExpirations::$expiredAt = now()->addHour();
 
         $this->get('/user/1/number/10')->assertOk();
     }
 
-    public function test_specifies_parameter_with_attribute_not_found(): void
+    #[DefineRoute('definesRouteWithMultipleParametersAndAttribute')]
+    public function test_specifies_parameter_with_attribute_gone(): void
     {
-        UserWithExpirations::$expiresAt = now()->subSecond();
+        UserWithExpirations::$expiredAt = now()->subSecond();
 
-        Route::get('/user/{user}/number/{number}', fn(UserWithExpirations $user) => $user)
-            ->middleware('web', 'expires:user.customTimestamp');
-
-        $this->get('/user/1/number/10')->assertNotFound();
+        $this->get('/user/1/number/10')->assertStatus(410);
     }
 
+    public static function definesRouteRelative($router): void
+    {
+        $router->get('/user/{user}', fn(UserWithExpirations $user) => $user)
+            ->middleware(['web', 'expires:user,60']);
+    }
+
+    #[DefineRoute('definesRouteRelative')]
     public function test_uses_relative_minutes(): void
     {
-        Route::get('/user/{user}', fn(User $user) => $user)->middleware('web', 'expires:user,60');
-
         $this->get('/user/1')->assertOk();
     }
 
-    public function test_uses_relative_minutes_not_found(): void
+    #[DefineRoute('definesRouteRelative')]
+    public function test_uses_relative_minutes_gone(): void
     {
         User::query()->update(['created_at' => now()->subDay()]);
 
-        Route::get('/user/{user}', fn(User $user) => $user)->middleware('web', 'expires:user,60');
-
-        $this->get('/user/1')->assertNotFound();
+        $this->get('/user/1')->assertStatus(410);
     }
 
+    public static function definesRouteRelativeString($router): void
+    {
+        $router->get('/user/{user}', fn(UserWithExpirations $user) => $user)
+            ->middleware(['web', 'expires:user,1 hour']);
+    }
+
+    #[DefineRoute('definesRouteRelativeString')]
     public function test_uses_relative_time(): void
     {
-        Route::get('/user/{user}', fn(User $user) => $user)->middleware('web', 'expires:user,1 hour');
+        $this->get('/user/1')->assertOk();
+    }
+
+    #[DefineRoute('definesRouteRelativeString')]
+    public function test_uses_relative_time_gone(): void
+    {
+        User::query()->update(['created_at' => now()->subDay()]);
+
+        $this->get('/user/1')->assertStatus(410);
+    }
+
+    public static function definesRouteObject(Router $router): void
+    {
+        $router->get('/object/{object}', fn($object) => $object)->middleware(['web', 'expires']);
+    }
+
+    #[DefineRoute('definesRouteObject')]
+    public function test_uses_object_data(): void
+    {
+        $this->app->make('router')->bind('object', fn() => (object) ['expired_at' => now()->addHour()]);
+
+        $this->get('/object/1')->assertOk();
+    }
+
+    #[DefineRoute('definesRouteObject')]
+    public function test_uses_object_data_gone(): void
+    {
+        $this->app->make('router')->bind('object', fn() => (object) ['expired_at' => now()->subSecond()]);
+
+        $this->get('/object/1')->assertStatus(410);
+    }
+
+    public static function definesRouteObjectWithParameter(Router $router): void
+    {
+        $router->get('/object/{object}', fn($object) => $object)->middleware(['web', 'expires:object.foo']);
+    }
+
+    #[DefineRoute('definesRouteObjectWithParameter')]
+    public function test_uses_object_data_with_parameter(): void
+    {
+        $this->app->make('router')->bind('object', fn() => (object) ['foo' => now()->addHour()]);
+
+        $this->get('/object/1')->assertOk();
+    }
+
+    #[DefineRoute('definesRouteObjectWithParameter')]
+    public function test_uses_object_data_with_parameter_gone(): void
+    {
+        $this->app->make('router')->bind('object', fn() => (object) ['expired_at' => now()->subSecond()]);
+
+        $this->get('/object/1')->assertStatus(410);
+    }
+
+    public static function definesRouteObjectWithRelative(Router $router): void
+    {
+        $router->get('/object/{object}', fn($object) => $object)->middleware(['web', 'expires:object.foo,60']);
+    }
+
+    #[DefineRoute('definesRouteObjectWithRelative')]
+    public function test_uses_object_data_with_parameter_relative(): void
+    {
+        $this->app->make('router')->bind('object', fn() => (object) ['foo' => now()->addHour()]);
+
+        $this->get('/object/1')->assertOk();
+    }
+
+    #[DefineRoute('definesRouteObjectWithRelative')]
+    public function test_uses_object_data_with_parameter_relative_gone(): void
+    {
+        $this->app->make('router')->bind('object', fn() => (object) ['foo' => now()->subDay()]);
+
+        $this->get('/object/1')->assertStatus(410);
+    }
+
+    public static function definesRouteWithExpirable(Router $router): void
+    {
+        $router->get('/user/{user}', fn(UserExpirable $user) => $user)->middleware(['web', 'expires']);
+    }
+
+    #[DefineRoute('definesRouteWithExpirable')]
+    public function test_uses_route_expirable_object(): void
+    {
+        UserExpirable::$expiredAt = now()->addHour();
 
         $this->get('/user/1')->assertOk();
     }
 
-    public function test_uses_relative_time_not_found(): void
+    #[DefineRoute('definesRouteWithExpirable')]
+    public function test_uses_route_expirable_object_gone(): void
     {
-        User::query()->update(['created_at' => now()->subDay()]);
+        UserExpirable::$expiredAt = now()->subSecond();
 
-        Route::get('/user/{user}', fn(User $user) => $user)->middleware('web', 'expires:user,1 hour');
-
-        $this->get('/user/1')->assertNotFound();
+        $this->get('/user/1')->assertStatus(410);
     }
 
-    public function test_uses_object_data(): void
+    public static function definesRouteWithExpirableAndAttribute(Router $router): void
     {
-        Route::bind('object', fn() => (object) ['expired_at' => now()->addHour()]);
-
-        Route::get('/object/{object}', fn(User $user) => $user)->middleware('web', 'expires');
-
-        $this->get('/object/1')->assertOk();
+        $router->get('/user/{user}', fn(UserExpirable $user) => $user)->middleware([
+            'web', 'expires:user.customTimestamp'
+        ]);
     }
 
-    public function test_uses_object_data_not_found(): void
+    #[DefineRoute('definesRouteWithExpirableAndAttribute')]
+    public function test_uses_route_expirable_attribute_takes_precedence(): void
     {
-        Route::bind('object', fn() => (object) ['expired_at' => now()->subSecond()]);
+        UserExpirable::$expiredAt = now()->addHour();
 
-        Route::get('/object/{object}', fn(User $user) => $user)->middleware('web', 'expires');
-
-        $this->get('/object/1')->assertNotFound();
+        $this->get('/user/1')->assertOk();
     }
 
-    public function test_uses_object_data_with_parameter(): void
+    #[DefineRoute('definesRouteWithExpirableAndAttribute')]
+    public function test_uses_route_expirable_attribute_takes_precedence_gone(): void
     {
-        Route::bind('object', fn() => (object) ['foo' => now()->addHour()]);
+        UserExpirable::$expiredAt = now()->subSecond();
 
-        Route::get('/object/{object}', fn(User $user) => $user)->middleware('web', 'expires:object.foo');
-
-        $this->get('/object/1')->assertOk();
+        $this->get('/user/1')->assertStatus(410);
     }
 
-    public function test_uses_object_data_with_parameter_not_found(): void
+    public static function definesRouteWithExpirableAndRelative(Router $router): void
     {
-        Route::bind('object', fn() => (object) ['foo' => now()->subSecond()]);
-
-        Route::get('/object/{object}', fn(User $user) => $user)->middleware('web', 'expires:object.foo');
-
-        $this->get('/object/1')->assertNotFound();
+        $router->get('/user/{user}', fn(UserExpirable $user) => $user)->middleware([
+            'web', 'expires:user,60'
+        ]);
     }
 
-    public function test_uses_object_data_with_parameter_relative(): void
+    #[DefineRoute('definesRouteWithExpirableAndRelative')]
+    public function test_uses_route_expirable_doesnt_uses_relative(): void
     {
-        Route::bind('object', fn() => (object) ['foo' => now()]);
+        UserExpirable::$expiredAt = now();
 
-        Route::get('/object/{object}', fn(User $user) => $user)->middleware('web', 'expires:object.foo,60');
-
-        $this->get('/object/1')->assertOk();
+        $this->get('/user/1')->assertOk();
     }
 
-    public function test_uses_object_data_with_parameter_relative_not_found(): void
+    #[DefineRoute('definesRouteWithExpirableAndRelative')]
+    public function test_uses_route_expirable_doesnt_uses_relative_gone(): void
     {
-        Route::bind('object', fn() => (object) ['foo' => now()->subDay()]);
+        UserExpirable::$expiredAt = now()->subDay();
 
-        Route::get('/object/{object}', fn(User $user) => $user)->middleware('web', 'expires:object.foo,60');
+        $this->get('/user/1')->assertStatus(410);
+    }
 
-        $this->get('/object/1')->assertNotFound();
+    #[DefineRoute('definesRouteRelative')]
+    public function test_uses_default_created_at_column_if_model_doesnt_uses_timestamps_when_relative(): void
+    {
+        UserWithExpirations::$getCreatedAtColumn = null;
+        UserWithExpirations::$expiredAt = now()->addHour();
+
+        $this->get('/user/1')->assertOk();
     }
 }
