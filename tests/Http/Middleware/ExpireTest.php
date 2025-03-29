@@ -79,11 +79,11 @@ class ExpireTest extends TestCase
     {
         UserWithExpirations::$expiredAt = now()->subSecond();
 
-        $this->get('/user/1')->assertStatus(410)->dump();
+        $this->get('/user/1')->assertStatus(410);
 
         UserWithExpirations::$expiredAt = now();
 
-        $this->get('/user/1')->assertStatus(410)->dump();
+        $this->get('/user/1')->assertStatus(410);
     }
 
     public static function definesRouteWithMultipleParameters($router): void

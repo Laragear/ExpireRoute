@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\DateFactory;
 use Laragear\ExpireRoute\Contracts\RouteExpirable;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use function array_pad;
 use function data_get;
@@ -155,7 +156,11 @@ class Expires
             $message = $previous->getMessage();
         }
 
-        throw NotFoundHttpException::fromStatusCode(410, $message, $previous);
+        if (method_exists(NotFoundHttpException::class, 'fromStatusCode')) {
+            throw NotFoundHttpException::fromStatusCode(410, $message, $previous);
+        }
+
+        throw new HttpException(410, $message, $previous);
     }
 
     /**
