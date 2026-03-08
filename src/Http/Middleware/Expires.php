@@ -32,7 +32,7 @@ class Expires
     /**
      * The name of the middleware.
      */
-    public const SIGNATURE = 'expires';
+    public const string SIGNATURE = 'expires';
 
     /**
      * Create a new middleware instance.

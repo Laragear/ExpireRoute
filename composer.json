@@ -3,7 +3,7 @@
     "description": "Don't find route models created after a moment in time.",
     "type": "library",
     "license": "MIT",
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
     "prefer-stable": true,
     "authors": [
         {
