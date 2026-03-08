@@ -54,13 +54,15 @@ jobs:
     strategy:
       matrix:
         php-version:
-          - 8.2
           - 8.3
           - 8.4
+          - 8.5
         laravel-constraint:
-          - 11.*
           - 12.*
-        dependencies: [ lowest, highest ]
+          - 13.*
+        dependencies:
+          - lowest
+          - highest
 
     steps:
       - name: Set up PHP

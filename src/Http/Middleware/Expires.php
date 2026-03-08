@@ -75,7 +75,7 @@ class Expires
      */
     protected function getLastRouteParameter(Request $request): ?string
     {
-        return Arr::last($request->route()->parameterNames()); // @phpstan-ignore-line
+        return Arr::last($request->route()->parameterNames());
     }
 
     /**

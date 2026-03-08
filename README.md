@@ -23,11 +23,12 @@ Route::get('/payment/{payment}', function (Payment $payment) {
 
 [![](.github/assets/support.png)](https://github.com/sponsors/DarkGhostHunter)
 
-Your support allows me to keep this package free, up-to-date and maintainable. Alternatively, you can **[spread the word!](http://twitter.com/share?text=I%20am%20using%20this%20cool%20PHP%20package&url=https://github.com%2FLaragear%2FExpireRoute&hashtags=PHP,Laravel)**
+Your support allows me to keep this package free, up to date and maintainable. Alternatively, you can **[spread the word!](http://twitter.com/share?text=I%20am%20using%20this%20cool%20PHP%20package&url=https://github.com%2FLaragear%2FExpireRoute&hashtags=PHP,Laravel)**
 
 ## Requirements
 
-- Laravel 11 or later
+- PHP 8.3 or later
+- Laravel 12 or later
 
 ## Installation
 
@@ -192,10 +193,10 @@ There should be no problems using this package with Laravel Octane.
 
 ## Security
 
-If you discover any security related issues, please email darkghosthunter@gmail.com instead of using the issue tracker.
+If you discover any security-related issues, please email darkghosthunter@gmail.com instead of using the issue tracker.
 
 # License
 
-This specific package version is licensed under the terms of the [MIT License](LICENSE.md), at time of publishing.
+This specific package version is licensed under the terms of the [MIT License](LICENSE.md), at the time of publishing.
 
-[Laravel](https://laravel.com) is a Trademark of [Taylor Otwell](https://github.com/TaylorOtwell/). Copyright © 2011-2025 Laravel LLC.
+[Laravel](https://laravel.com) is a Trademark of [Taylor Otwell](https://github.com/TaylorOtwell/). Copyright © 2011–2026 Laravel LLC.
