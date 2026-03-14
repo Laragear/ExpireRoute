@@ -42,7 +42,7 @@ composer require laragear/expire-route
 
 While [Laravel Temporarily Protected Routes](https://laravel.com/docs/12.x/urls#signed-urls) works great for making routes available for a given amount of time, this library uses your Eloquent Model in the route to expire it through a middleware.
 
-To better understand how the middleware works, let's imagine we have the `App\Models\Payment` model with an `expires_at` attribute that determines when the payment should be become invalid. The `expires` middleware does this automatically: if the `expires_at` time is past, the request will be aborted with a `HTTP 410 Gone` code.
+To better understand how the middleware works, let's imagine we have the `App\Models\Payment` model with an `expires_at` attribute that determines when the payment should be become invalid. The `expires` middleware does this automatically: if the `expired_at` time is past, the request will be aborted with a `HTTP 410 Gone` code.
 
 ```php
 use Illuminate\Support\Facades\Route;
@@ -52,6 +52,10 @@ Route::get('payment/{payment}', function (Payment $invite) {
     // ...
 })->middleware('expires');
 ```
+
+> [!WARNING]
+>
+> If the property or attribute doesn't exist or returns `null`, it will be assumed the model has **not** expired yet.
 
 ### Multiple route parameters
 
@@ -71,7 +75,7 @@ Route::get('payment/{payment}/detail/{detail}')
 
 ### Custom attribute
 
-If your model doesn't have an `expires_at` attribute to check, you can use `dot.notation` to traverse the object attributes and find the expiration time.
+If your model or object doesn't have an `expired_at` attribute to check, you can use `dot.notation` to traverse the object attributes and find the expiration time.
 
 ```php
 use Illuminate\Support\Facades\Route;
@@ -97,7 +101,7 @@ Route::get('payment/{payment}', function (Payment $party) {
 })->middleware('expires:payment,60');
 ```
 
-If you want to calculate the time from other attribute than `created_at`, issue the name of the attribute using `dot.notation`. 
+If you want to calculate the time from another attribute than `created_at`, issue the name of the attribute using `dot.notation`.
 
 ```php
 use Illuminate\Support\Facades\Route;
@@ -127,6 +131,9 @@ class Payment extends Model implements RouteExpirable
 {
     // ...
     
+    /**
+     * Returns the moment in time the route with this model should be considered expired.
+     */
     public function routeExpiresAt(): DateTimeInterface
     {
         return $this->created_at->addMinutes(60);
