@@ -25,7 +25,7 @@ use function is_numeric;
  * @method static \Laragear\ExpireRoute\Http\Middleware\ExpiresDeclaration using(string $parameter)
  * @method static \Laragear\ExpireRoute\Http\Middleware\ExpiresDeclaration after(string $interval)
  * @method static \Laragear\ExpireRoute\Http\Middleware\ExpiresDeclaration in(int $amount)
- * @method static \Laragear\ExpireRoute\Http\Middleware\ExpiresDeclaration and(int $amount)
+ * @method static \Laragear\ExpireRoute\Http\Middleware\ExpiresDeclaration and (int $amount)
  */
 class Expires
 {
@@ -45,8 +45,13 @@ class Expires
     /**
      * Handle the incoming request.
      */
-    public function handle(Request $request, Closure $next, string $parameter = '', string $relative = ''): mixed
-    {
+    public function handle(
+        Request $request,
+        Closure $next,
+        string $parameter = '',
+        string $relative = '',
+        string $view = '',
+    ): mixed {
         // If there is no parameter to find, fail.
         if ($parameter === '' && !$parameter = $this->getLastRouteParameter($request)) {
             throw new RuntimeException("The path [{$request->path()}] has no route parameter to find an expiration.");
@@ -64,7 +69,7 @@ class Expires
 
         // If the expiration time is past, then bail out.
         if ($expiresAt->isPast()) {
-            $this->throwResponse($object);
+            $this->throwResponse($object, $view);
         }
 
         return $next($request);
@@ -127,7 +132,7 @@ class Expires
     protected function parseTimestamp(mixed $object, string $attribute, string $relative): Carbon
     {
         return $this->addRelativeTimeToDatetime(
-            $this->date->parse(data_get($object, $attribute) ?? 'yesterday'), $relative
+            $this->date->parse(data_get($object, $attribute) ?? 'yesterday'), $relative,
         );
     }
 
@@ -146,7 +151,7 @@ class Expires
     /**
      * Throws the response to the browser.
      */
-    protected function throwResponse(mixed $object): never
+    protected function throwResponse(mixed $object, string $redirect): never
     {
         $message = 'The route has expired.';
         $previous = null;

@@ -1,7 +1,7 @@
 # Expire Route
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/laragear/expire-route.svg)](https://packagist.org/packages/laragear/expire-route)
-[![Latest stable test run](https://github.com/Laragear/ExpireRoute/actions/workflows/php.yml/badge.svg?branch=1.x)](https://github.com/Laragear/ExpireRoute/actions/workflows/php.yml)
+[![Latest stable test run](https://github.com/Laragear/ExpireRoute/actions/workflows/php.yml/badge.svg)](https://github.com/Laragear/ExpireRoute/actions/workflows/php.yml)
 [![Codecov Coverage](https://codecov.io/gh/Laragear/ExpireRoute/graph/badge.svg?token=jRXlb5UwCf)](https://codecov.io/gh/Laragear/ExpireRoute)
 [![Maintainability](https://qlty.sh/badges/2d622a6d-c1b3-4d87-8fcc-5a7edd9daa7b/maintainability.svg)](https://qlty.sh/gh/Laragear/projects/ExpireRoute)
 [![Sonarcloud Status](https://sonarcloud.io/api/project_badges/measure?project=Laragear_ExpireRoute&metric=alert_status)](https://sonarcloud.io/dashboard?id=Laragear_ExpireRoute)
